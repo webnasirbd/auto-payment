@@ -56,11 +56,12 @@ public class AppConfig {
         return false;
     }
 
-    public static boolean isPaymentSms(Context ctx, String body) {
+    public static boolean isPaymentSms(Context ctx, String sender, String body) {
         String lo = body.toLowerCase();
-        boolean hasBkash  = prefs(ctx).getBoolean(K_BKASH, true)  && (sender.toLowerCase().contains("bkash")  || lo.contains("bkash")  || lo.contains("বিকাশ"));
-        boolean hasNagad  = prefs(ctx).getBoolean(K_NAGAD, true)  && (sender.toLowerCase().contains("nagad")  || lo.contains("nagad")  || lo.contains("নগদ"));
-        boolean hasRocket = prefs(ctx).getBoolean(K_ROCKET, false) && (lo.contains("rocket") || lo.contains("dbbl") || lo.contains("dutch"));
+        String snd = sender.toLowerCase();
+        boolean hasBkash  = prefs(ctx).getBoolean(K_BKASH, true)  && (snd.contains("bkash")  || lo.contains("bkash")  || lo.contains("বিকাশ"));
+        boolean hasNagad  = prefs(ctx).getBoolean(K_NAGAD, true)  && (snd.contains("nagad")  || lo.contains("nagad")  || lo.contains("নগদ"));
+        boolean hasRocket = prefs(ctx).getBoolean(K_ROCKET, false) && (snd.contains("rocket") || lo.contains("rocket") || lo.contains("dbbl") || lo.contains("dutch"));
         return hasBkash || hasNagad || hasRocket;
     }
 }

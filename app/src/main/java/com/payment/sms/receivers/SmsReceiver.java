@@ -49,7 +49,7 @@ public class SmsReceiver extends BroadcastReceiver {
                 }
 
                 // Payment SMS?
-                if (!AppConfig.isPaymentSms(ctx, body)) {
+                if (!AppConfig.isPaymentSms(ctx, sender, body)) {
                     Log.d(TAG, "Not a payment SMS");
                     continue;
                 }
