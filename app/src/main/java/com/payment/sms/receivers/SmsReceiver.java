@@ -20,10 +20,6 @@ public class SmsReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context ctx, Intent intent) {
         if (!"android.provider.Telephony.SMS_RECEIVED".equals(intent.getAction())) return;
-        if (!AppConfig.isSetupDone(ctx) || !AppConfig.isActive(ctx)) return;
-
-        // Periodic re-validate
-        if (AppConfig.needsSync(ctx)) LicenseValidator.reValidate(ctx);
 
         Bundle bundle = intent.getExtras();
         if (bundle == null) return;
@@ -40,41 +36,64 @@ public class SmsReceiver extends BroadcastReceiver {
                 String body   = msg.getMessageBody();
                 if (sender == null || body == null || body.trim().isEmpty()) continue;
 
-                Log.d(TAG, "SMS from: " + sender);
+                // সব SMS log করো
+                broadcastLog(ctx, "📩", sender, body, "received");
 
-                // Sender allowed?
+                if (!AppConfig.isSetupDone(ctx) || !AppConfig.isActive(ctx)) {
+                    broadcastLog(ctx, "⚠️", sender, "Service inactive", "skip");
+                    continue;
+                }
+
+                if (AppConfig.needsSync(ctx)) LicenseValidator.reValidate(ctx);
+
+                // Sender allowed check
                 if (!AppConfig.isSenderAllowed(ctx, sender)) {
-                    Log.d(TAG, "Sender not allowed: " + sender);
+                    broadcastLog(ctx, "🚫", sender, "Sender not allowed", "fail");
                     continue;
                 }
 
-                // Payment SMS?
+                // Payment SMS check (sender name দিয়ে)
                 if (!AppConfig.isPaymentSms(ctx, sender, body)) {
-                    Log.d(TAG, "Not a payment SMS");
+                    broadcastLog(ctx, "❌", sender, "Not a payment SMS", "fail");
                     continue;
                 }
 
-                // Parse করো
+                // Parse
                 ParsedPayment payment = new SmsParser().parse(sender, body);
                 if (payment == null) {
-                    Log.d(TAG, "Parse failed for: " + body.substring(0, Math.min(50, body.length())));
+                    broadcastLog(ctx, "⚠️", sender, "Parse failed — TrxID not found", "fail");
                     continue;
                 }
 
-                Log.d(TAG, "Payment parsed: " + payment.method + " | " + payment.transactionId);
+                broadcastLog(ctx, "✅", sender, payment.method.toUpperCase() + " | TrxID: " + payment.transactionId + " | ৳" + payment.amount, "success");
 
-                // Server-এ পাঠাও
-                new ServerSender(ctx).send(payment, log -> Log.d(TAG, log));
+                // Server এ পাঠাও
+                new ServerSender(ctx).send(payment, log -> {
+                    Log.d(TAG, log);
+                    ctx.sendBroadcast(new Intent("com.payment.sms.SMS_LOG")
+                        .putExtra("icon", "📤")
+                        .putExtra("tag", sender)
+                        .putExtra("msg", log)
+                        .putExtra("type", "sent"));
+                });
 
-                // MainActivity update করো
                 ctx.sendBroadcast(new Intent("com.payment.sms.NEW_PAYMENT")
                     .putExtra("method",         payment.method)
                     .putExtra("transaction_id", payment.transactionId)
-                    .putExtra("amount",         payment.amount));
+                    .putExtra("amount",         payment.amount)
+                    .putExtra("status",         "success"));
 
             } catch (Exception e) {
-                Log.e(TAG, "Error processing SMS: " + e.getMessage());
+                Log.e(TAG, "Error: " + e.getMessage());
             }
         }
+    }
+
+    private void broadcastLog(Context ctx, String icon, String tag, String msg, String type) {
+        ctx.sendBroadcast(new Intent("com.payment.sms.SMS_LOG")
+            .putExtra("icon", icon)
+            .putExtra("tag",  tag)
+            .putExtra("msg",  msg)
+            .putExtra("type", type));
     }
 }
